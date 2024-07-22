@@ -14,11 +14,16 @@ aoai_api_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 aoai_api_deployment_name = os.getenv("AZURE_OPENAI_GPT4_DEPLOYMENT_NAME")
 aoai_tts_deploy_name = os.getenv("AZURE_OPENAI_TTS_DEPLOYMENT_NAME")
 # alloy, echo, fable, onyx, nova, and shimmer.
-aoai_tts_voice_name = "echo"
+aoai_tts_voice_name = "nova"
 
 # Initialize session state
+if 'text_ready' not in st.session_state:
+    st.session_state.text_ready = False
 if 'audio_ready' not in st.session_state:
     st.session_state.audio_ready = False
+if 'button_disabled' not in st.session_state:
+    st.session_state.button_disabled = False
+
 
 def get_chat_response(user_input):
     client = AzureOpenAI(
@@ -69,38 +74,54 @@ def text_to_speech(text):
 # Streamlit app logic
 st.title("Voice-Enabled Chatbot")
 
-user_input = st.text_input("Ask something:")
+with st.form("user_form"):
+    msg = st.text_input("Message: ", value = "")
+    submit_button = st.form_submit_button(label="Send")
 
-if st.button("Send"):
-    if user_input:
-        # Show "thinking" loader
-        with st.spinner('Thinking...'):
-            # Get chat response from Azure OpenAI
-            response_text = get_chat_response(user_input)
-            
-            # Convert text to speech
-            speech_data = text_to_speech(response_text)
-            
-            # Encode the speech data for embedding in HTML
-            b64_audio = base64.b64encode(speech_data).decode()
-            
-            # Set the audio ready flag in session state
-            st.session_state.audio_ready = True
-            
-            # Wait for the next iteration to display the audio player
-            time.sleep(1)
+if submit_button:
+    if not st.session_state.button_disabled:
+        st.session_state.button_disabled = True
+
+        if not st.session_state.text_ready:
+            with st.spinner('Thinking...'):
+                # Get chat response from Azure OpenAI
+                response_text = get_chat_response(msg)
+                
+                st.markdown(f"<p>{response_text}</p>", unsafe_allow_html=True)
+
+                st.session_state.text_ready = True
+
+            if st.session_state.text_ready:
+                with st.spinner('Generating audio...'):
+                    # Convert text to speech
+                    speech_data = text_to_speech(response_text)
+
+                    # Encode the speech data for embedding in HTML
+                    b64_audio = base64.b64encode(speech_data).decode()
+
+                    # Set the audio ready flag in session state
+                    st.session_state.audio_ready = True
+
+                    # Wait for the next iteration to display the audio player
+                    time.sleep(1)        
 
         # Only display the audio player if the audio is ready
         if st.session_state.audio_ready:
             audio_tag = f"""
             <div style='margin-top:20px;'>
             <audio controls>
-              <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
-              Your browser does not support the audio element.
+                <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+                Your browser does not support the audio element.
             </audio>
             </div>
             """
             
-            # Display the text response and the audio player in Streamlit
-            st.markdown(f"<p>{response_text}</p>", unsafe_allow_html=True)
+            # Display the audio player in Streamlit
             st.markdown(audio_tag, unsafe_allow_html=True)
+
+
+# Reset button state after displaying the response
+if st.session_state.audio_ready:
+    st.session_state.text_ready = False
+    st.session_state.audio_ready = False
+    st.session_state.button_disabled = False

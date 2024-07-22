@@ -33,7 +33,7 @@ def get_chat_response(user_input):
     )
 
     conversaion = [
-        {"role": "system", "content": "you are helpful assistant"},
+        {"role": "system", "content": "you are helpful assistant that answer is short and concise manner."},
         {"role": "user", "content": user_input}
     ]
 
@@ -77,6 +77,8 @@ st.title("Voice-Enabled Chatbot")
 with st.form("user_form"):
     msg = st.text_input("Message: ", value = "")
     submit_button = st.form_submit_button(label="Send")
+
+st.divider()
 
 if submit_button:
     if not st.session_state.button_disabled:
